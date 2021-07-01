@@ -1,17 +1,3 @@
-// ================================================ env example =======================================================
-// TELNYX_API_KEY=API-KEY
-// CONNECTION_ID=111111111
-// GOOGLE_APPLICATION_CREDENTIALS="/Users/telnyx/creds.json"
-// IP_ADDRESS=x.x.x.x
-// FforkPort ORK_PORT=9000
-
-TELNYX_API_KEY="KEY0178F60AFAEEE22E912931490F0F1C5A_D8i9aqVu0qj3zfHWUXuveJ"
-CONNECTION_ID=1619962744679695607
-GOOGLE_APPLICATION_CREDENTIALS="/home/orgacac/develop/twilioStreamInterface/upheld-setting-293615-5106604f6585.json"
-IP_ADDRESS="35.247.163.18"
-FORK_PORT=9000
-
-
 // ================================================ Dependencies =======================================================
 
 require("dotenv").config();
@@ -19,10 +5,10 @@ const express = require("express");
 const speech = require("@google-cloud/speech");
 
 // =============================================== Telnyx Account Details ==============================================
-const telnyx = require("telnyx")(TELNYX_API_KEY);
+const telnyx = require("telnyx")(process.env.TELNYX_API_KEY);
 
-const forkIP = "35.247.163.18";
-const forkPort = 9000;
+const forkIP = process.env.IP_ADDRESS;
+const forkPort = process.env.FORK_PORT;
 // ================================================ RESTful API Creation ================================================
 const rest = express();
 rest.use(express.json());
@@ -64,9 +50,10 @@ const recognizeStream = client
 // ================================================ UDP Listener Config =============================================
 
 const stream = udp({
-	address: "35.247.163.18", //address to bind to
-	port: 9000, //udp port to send to
-	bindingPort: 9000, //udp port to listen on. Default: port
+	address: forkIP, //address to bind to
+	broadcast: '255.255.255.255',
+	port: forkPort, //udp port to send to
+	bindingPort: forkPort, //udp port to listen on. Default: port
 	reuseAddr: true, //boolean: allow multiple processes to bind to the
 	//         same address and port. Default: true
 	loopback: false, //boolean: whether or not to receive sent datagrams
@@ -87,7 +74,7 @@ const handleForkMedia = async (call, event) => {
 			rx: `udp:${forkIP}:${forkPort}`,
 			tx: `udp:${forkIP}:${forkPort}`,
 		});
-		
+
 	} catch (error) {
 		if (error) {
 			console.error(`HandleFork - ${error}`);
@@ -107,21 +94,10 @@ const handleAnswer = async (call, event) => {
 
 // ================================================    WEBHOOK API IVR   ================================================
 
-rest.post('/outbound', async (request, response) => {
-  const to_number = request.body.to_number;
-
-  try {
-    const { data: call } = await telnyx.calls.create({ connection_id: process.env.TELNYX_CONNECTION_ID, to: to_number, from: process.env.TELNYX_NUMBER });
-    response.render('messagesuccess');
-  } catch (e) {
-    response.send(e);
-  }
-});
-
 rest.post(`/call-flow`, async (req, res) => {
 	try {
 		res.sendStatus(200);
-		const event = req.body.data;
+		const event = req.body;
 		console.log(event.event_type);
 		const context = event.payload.client_state
 			? fromBase64(event.payload.client_state)
@@ -129,18 +105,18 @@ rest.post(`/call-flow`, async (req, res) => {
 		const call = new telnyx.Call({
 			call_control_id: event.payload.call_control_id,
 		});
-			
+
 		switch (event.event_type) {
-			case "call.initiated":
+			case "call_initiated":
 				handleAnswer(call, event);
 				break;
-			case "call.answered":
+			case "call_answered":
 				handleForkMedia(call, event);
 
 				break;
-			case "call.playback.ended":
+			case "call_playback_ended":
 				break;
-			case "call.hangup":
+			case "call_hangup":
 				break;
 			default:
 				break;
