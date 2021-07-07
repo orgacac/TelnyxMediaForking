@@ -1,10 +1,12 @@
 // ================================================ Dependencies =======================================================
+
 require("dotenv").config();
 const express = require("express");
 const speech = require("@google-cloud/speech");
 const udp = require("datagram-stream");
 // =============================================== Telnyx Account Details ==============================================
 const telnyx = require("telnyx")(process.env.TELNYX_API_KEY);
+
 const forkIP = process.env.IP_ADDRESS;
 const forkPort = process.env.FORK_PORT;
 // ================================================ RESTful API Creation ================================================
@@ -23,8 +25,8 @@ server.on('error', function (error) {
 });
 // emits on new datagram msg
 server.on('message', function (msg, info) {
-    console.log('Data received from client : ' + msg.toString());
-    console.log('Received %d bytes from %s:%d\n', msg.length, info.address, info.port);
+    //console.log('Data received from client : ' + msg.toString());
+   // console.log('Received %d bytes from %s:%d\n', msg.length, info.address, info.port);
 /*   server.send(msg, info.port, '35.247.163.18', function (error) {
         if (error) {
             client.close();
@@ -33,7 +35,6 @@ server.on('message', function (msg, info) {
         }
     });*/
 });
-
 //emits when socket is ready and listening for datagram msgs
 server.on('listening', function () {
     var address = server.address();
@@ -50,27 +51,11 @@ server.on('close', function () {
 });
 server.bind(9001)
 
-//===================================== UDP SERVER END ===============
+
 
 // ================================================ Auxillary Functions ================================================
 const toBase64 = (data) => new Buffer.from(data).toString("base64");
 const fromBase64 = (data) => new Buffer.from(data, "base64").toString();
-
-// ================================================ UDP Listener Config =============================================
-
-const stream = udp({
-	//address: "0.0.0.0", //address to bind to
-	address: "35.247.163.18", //address to bind to
-	//broadcast: '255.255.255.255',
-	//port: forkPort, //udp port to send to
-	port: 9001, //udp port to send to
-	bindingPort: 9001, //udp port to listen on. Default: port
-	reuseAddr: true, //boolean: allow multiple processes to bind to the
-	//         same address and port. Default: true
-	loopback: false, //boolean: whether or not to receive sent datagrams
-	//         on the loopback device. Only applies to
-	//         multicast. Default: false
-});
 
 // ================================================ GoogleAPI  ================================================
 
@@ -103,8 +88,77 @@ const recognizeStream = client
 		console.log(data.results[0].alternatives[0].transcript)
 	);
 
+//===================================== UDP SERVER END ===============
+// ================================================ UDP Listener Creation =============================================
+//const udp = require("datagram-stream");
+//const udp = require('dgram');
+/*var udp = require('dgram');
+var udpclient = udp.createSocket('udp4');
+
+udpclient.on('listening', function () {
+    var address = '35.247.163.18';
+    var port = 9001;
+    var family = address.family;
+    var ipaddr = address.address;
+    console.log('Server ip :' + ipaddr);
+});
+
+udpclient.on('message', (msg, senderInfo) => {
+console.log('Messages received '+ msg)
+});
+*/
+var udpc = require('dgram');
+
+var buffer = require('buffer');
+
+// creating a client socket
+var udpclient = udpc.createSocket('udp4');
+//emits when socket is ready and listening for datagram msgs
+udpclient.on('listening', function () {
+    var address = '35.247.163.18';
+    var port = 9001;
+    var family = address.family;
+    var ipaddr = address.address;
+    console.log('Server ip :' + ipaddr);
+});
+
+
+udpclient.on('message', function (msg, info) {
+    console.log('Data received from server : ' + msg.toString());
+    console.log('Received %d bytes from %s:%d\n', msg.length, info.address, info.port); 
+    recognizeStream.write(msg);
+    console.log('Write to Stream completed');
+});
+
+//buffer msg
+var data = Buffer.from('Raman Saini');
+udpclient.send(data, 9001, '35.247.163.18', function (error) {
+    if (error) {
+        client.close();
+    } else {
+        console.log('Data sent !!!');
+    }
+});
+
+// ================================================ UDP Listener Config =============================================
+
+const stream = udp({
+	//address: "0.0.0.0", //address to bind to
+	address: "35.247.163.18", //address to bind to
+	//broadcast: '255.255.255.255',
+	//port: forkPort, //udp port to send to
+	port: 9001, //udp port to send to
+	bindingPort: 9001, //udp port to listen on. Default: port
+	reuseAddr: true, //boolean: allow multiple processes to bind to the
+	//         same address and port. Default: true
+	loopback: false, //boolean: whether or not to receive sent datagrams
+	//         on the loopback device. Only applies to
+	//         multicast. Default: false
+});
+
 //pipe whatever is received to Google Cloud
 stream.pipe(recognizeStream);
+
 
 // ================================================ TELNYX COMMANDS API  ================================================
 // Fork Media 
